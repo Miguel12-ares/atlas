@@ -1,0 +1,71 @@
+version: '3.8'
+
+# Sistema Atlas - Configuración Docker Compose
+# Servicios: PHP-Apache, MySQL y phpMyAdmin
+
+services:
+  # Servicio PHP con Apache
+  php-apache:
+    container_name: atlas_php
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    volumes:
+      - ../src:/var/www/html/src
+      - ../public:/var/www/html/public
+      - ../storage:/var/www/html/storage
+    environment:
+      - APACHE_DOCUMENT_ROOT=/var/www/html/public
+    depends_on:
+      - mysql
+    networks:
+      - atlas_network
+    restart: unless-stopped
+
+  # Servicio MySQL 8.0
+  mysql:
+    container_name: atlas_mysql
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: atlas_root_2024
+      MYSQL_DATABASE: atlas_db
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../database:/docker-entrypoint-initdb.d:ro
+    networks:
+      - atlas_network
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password --bind-address=0.0.0.0
+
+  # Servicio phpMyAdmin
+  phpmyadmin:
+    container_name: atlas_phpmyadmin
+    image: phpmyadmin/phpmyadmin
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: atlas_root_2024
+      MYSQL_ROOT_PASSWORD: atlas_root_2024
+    depends_on:
+      - mysql
+    networks:
+      - atlas_network
+    restart: unless-stopped
+
+# Red privada para comunicación entre contenedores
+networks:
+  atlas_network:
+    driver: bridge
+
+# Volúmenes para persistencia de datos
+volumes:
+  mysql_data:
+    driver: local
+

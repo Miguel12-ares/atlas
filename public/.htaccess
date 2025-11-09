@@ -1,0 +1,78 @@
+# Sistema Atlas - Configuración de Apache
+# Archivo .htaccess para URLs amigables
+
+<IfModule mod_rewrite.c>
+    # Habilitar RewriteEngine
+    RewriteEngine On
+    
+    # Establecer la base para las redirecciones
+    RewriteBase /
+    
+    # Si el archivo o directorio existe, servir directamente
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    
+    # Redirigir todas las peticiones a index.php
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Configuración de seguridad
+<IfModule mod_headers.c>
+    # Prevenir clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+    
+    # Prevenir MIME type sniffing
+    Header always set X-Content-Type-Options "nosniff"
+    
+    # Habilitar protección XSS en navegadores
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # Referrer policy
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Deshabilitar listado de directorios
+Options -Indexes
+
+# Configuración de PHP
+<IfModule mod_php.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+    php_value max_execution_time 300
+    php_value date.timezone "America/Bogota"
+</IfModule>
+
+# Proteger archivos sensibles
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Configuración de cache para assets
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # Imágenes
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    
+    # CSS y JavaScript
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    
+    # Fuentes
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# Comprimir archivos de texto
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE text/javascript
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/json
+</IfModule>
+

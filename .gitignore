@@ -1,0 +1,104 @@
+# Sistema Atlas - Archivos y directorios ignorados por Git
+
+# ===================================================
+# LOGS
+# ===================================================
+/storage/logs/*.log
+*.log
+
+# ===================================================
+# UPLOADS
+# ===================================================
+/public/uploads/*
+!/public/uploads/equipos/.gitkeep
+!/public/uploads/qr/.gitkeep
+
+# ===================================================
+# ARCHIVOS DE CONFIGURACIÓN SENSIBLES
+# ===================================================
+.env
+.env.local
+.env.production
+
+# ===================================================
+# DEPENDENCIAS
+# ===================================================
+/vendor/
+composer.lock
+node_modules/
+package-lock.json
+
+# ===================================================
+# DOCKER
+# ===================================================
+docker-compose.override.yml
+
+# ===================================================
+# SISTEMA OPERATIVO
+# ===================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
+# ===================================================
+# IDEs Y EDITORES
+# ===================================================
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# PhpStorm / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# NetBeans
+nbproject/
+
+# Eclipse
+.buildpath
+.project
+.settings/
+
+# ===================================================
+# ARCHIVOS TEMPORALES
+# ===================================================
+*.tmp
+*.temp
+*.cache
+*.swp
+*.swo
+*~
+
+# ===================================================
+# BACKUPS
+# ===================================================
+*.bak
+*.backup
+*.sql.gz
+*.zip
+
+# ===================================================
+# OTROS
+# ===================================================
+# Archivos de prueba
+test.php
+prueba.php
+debug.php
+
