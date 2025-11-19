@@ -10,6 +10,8 @@
 
 namespace Atlas\Core;
 
+use Atlas\Core\Middleware;
+
 class Router
 {
     /**
@@ -124,11 +126,18 @@ class Router
 
     /**
      * Ejecuta el router y busca la ruta coincidente
+     * Aplica middleware de autenticación antes de ejecutar la acción
      * 
      * @return void
      */
     public function run(): void
     {
+        // Aplicar middleware de autenticación
+        if (!Middleware::handle($this->currentRoute, $this->method)) {
+            // El middleware ya manejó la respuesta (redirect o 403)
+            return;
+        }
+
         foreach ($this->routes as $route) {
             // Convertir parámetros dinámicos {param} a regex
             $pattern = preg_replace('/\{([a-zA-Z0-9_]+)\}/', '([a-zA-Z0-9_-]+)', $route['route']);

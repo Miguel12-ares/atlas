@@ -71,7 +71,32 @@ class RBAC
             return true;
         }
 
-        // Verificar si el rol existe y tiene permisos para el recurso
+        // Intentar obtener desde base de datos si existen las tablas
+        try {
+            $db = Database::getInstance();
+            
+            // Verificar si existe la tabla permisos
+            $tableExists = $db->fetch("SHOW TABLES LIKE 'permisos'");
+            
+            if ($tableExists) {
+                // Obtener desde base de datos
+                $sql = "SELECT COUNT(*) as count
+                        FROM permisos p
+                        INNER JOIN role_perm rp ON p.id_permiso = rp.id_permiso
+                        INNER JOIN roles r ON rp.id_rol = r.id_rol
+                        WHERE r.nombre_rol = ?
+                        AND p.recurso = ?
+                        AND (p.accion = ? OR p.accion = 'gestionar')";
+                
+                $result = $db->fetch($sql, [$role, $resource, $action]);
+                return $result && $result['count'] > 0;
+            }
+        } catch (\Exception $e) {
+            // Si falla, usar permisos hardcodeados
+            error_log("Error al verificar permisos en BD, usando fallback: " . $e->getMessage());
+        }
+
+        // Fallback: Verificar en array hardcodeado
         if (!isset(self::$permissions[$role]) || !isset(self::$permissions[$role][$resource])) {
             return false;
         }

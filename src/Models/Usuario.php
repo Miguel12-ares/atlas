@@ -350,5 +350,27 @@ class Usuario
             return false;
         }
     }
+
+    /**
+     * Obtiene los roles disponibles para registro público
+     * Excluye admin y portería (solo pueden ser asignados por admin)
+     * 
+     * @return array Array de roles
+     */
+    public function getRolesForRegistration(): array
+    {
+        try {
+            $sql = "SELECT id_rol, nombre_rol, descripcion 
+                    FROM roles 
+                    WHERE id_rol NOT IN (1, 6) 
+                    ORDER BY nombre_rol ASC";
+
+            return $this->db->fetchAll($sql);
+
+        } catch (\PDOException $e) {
+            error_log("Error en Usuario::getRolesForRegistration: " . $e->getMessage());
+            return [];
+        }
+    }
 }
 

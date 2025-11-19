@@ -12,6 +12,7 @@ namespace Atlas\Controllers;
 
 use Atlas\Core\Controller;
 use Atlas\Core\Auth;
+use Atlas\Core\Session;
 use Atlas\Models\Usuario;
 
 class AuthController extends Controller
@@ -91,7 +92,7 @@ class AuthController extends Controller
 
             // 3. Validar que los campos no estén vacíos
             if (empty($numero_identificacion) || empty($password)) {
-                $_SESSION['error_message'] = self::ERROR_CAMPOS_VACIOS;
+                Session::flash('error', self::ERROR_CAMPOS_VACIOS);
                 $this->redirect('/login');
                 return;
             }
@@ -101,14 +102,14 @@ class AuthController extends Controller
 
             // Si el usuario NO existe, retornar error genérico por seguridad
             if (!$usuario) {
-                $_SESSION['error_message'] = self::ERROR_CREDENCIALES;
+                Session::flash('error', self::ERROR_CREDENCIALES);
                 $this->redirect('/login');
                 return;
             }
 
             // 5. Verificar contraseña usando password_verify
             if (!password_verify($password, $usuario['password_hash'])) {
-                $_SESSION['error_message'] = self::ERROR_CREDENCIALES;
+                Session::flash('error', self::ERROR_CREDENCIALES);
                 $this->redirect('/login');
                 return;
             }
@@ -122,12 +123,12 @@ class AuthController extends Controller
         } catch (\PDOException $e) {
             // Manejo de errores de base de datos
             error_log("Error en login (PDO): " . $e->getMessage());
-            $_SESSION['error_message'] = self::ERROR_SERVIDOR;
+            Session::flash('error', self::ERROR_SERVIDOR);
             $this->redirect('/login');
         } catch (\Exception $e) {
             // Manejo de cualquier otra excepción
             error_log("Error en login (General): " . $e->getMessage());
-            $_SESSION['error_message'] = self::ERROR_SERVIDOR;
+            Session::flash('error', self::ERROR_SERVIDOR);
             $this->redirect('/login');
         }
     }
@@ -135,30 +136,29 @@ class AuthController extends Controller
     /**
      * Establece la sesión del usuario
      * Almacena datos en $_SESSION y regenera ID por seguridad
+     * Usa la clase Session para gestión avanzada con tokens
      * 
      * @param array $usuario Datos del usuario
      * @return void
      */
     private function establecerSesion(array $usuario): void
     {
-        // Regenerar ID de sesión para prevenir session fixation
-        // La sesión ya fue iniciada en public/index.php
-        session_regenerate_id(true);
+        // Datos del usuario para la sesión
+        $userData = [
+            'numero_identificacion' => $usuario['numero_identificacion'],
+            'nombres' => $usuario['nombres'],
+            'apellidos' => $usuario['apellidos'],
+            'email' => $usuario['email'] ?? '',
+            'rol_id' => $usuario['id_rol'],
+            'rol_nombre' => $usuario['nombre_rol'],
+            'puede_tener_equipo' => $usuario['puede_tener_equipo'] ?? true
+        ];
 
-        // Almacenar datos del usuario en $_SESSION
-        $_SESSION['user_id'] = $usuario['id_usuario'];
-        $_SESSION['numero_identificacion'] = $usuario['numero_identificacion'];
-        $_SESSION['nombres'] = $usuario['nombres'];
-        $_SESSION['apellidos'] = $usuario['apellidos'];
-        $_SESSION['rol_id'] = $usuario['id_rol'];
-        $_SESSION['rol_nombre'] = $usuario['nombre_rol'];
-        $_SESSION['logged_in'] = true;
-
-        // Almacenar timestamp de login
-        $_SESSION['login_time'] = time();
+        // Crear sesión con tokens y gestión avanzada
+        Session::create($usuario['id_usuario'], $userData);
 
         // Establecer mensaje de éxito
-        $_SESSION['success_message'] = '¡Bienvenido, ' . $usuario['nombres'] . '!';
+        Session::flash('success', '¡Bienvenido, ' . $usuario['nombres'] . '!');
     }
 
     /**
@@ -208,18 +208,176 @@ class AuthController extends Controller
      */
     public function logout(): void
     {
-        // Destruir sesión usando la clase Auth
-        Auth::logout();
+        // Establecer mensaje antes de destruir la sesión
+        $message = 'Sesión cerrada correctamente';
         
-        // Reiniciar sesión para establecer mensaje de éxito
-        // (Auth::logout() destruye la sesión, necesitamos reiniciarla)
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        $_SESSION['success_message'] = 'Sesión cerrada correctamente';
+        // Destruir sesión usando la clase Session
+        Session::destroy();
+        
+        // Reiniciar sesión solo para el mensaje flash
+        Session::init();
+        Session::flash('success', $message);
         
         // Redireccionar al login
         $this->redirect('/login');
+    }
+
+    /**
+     * Muestra el formulario de registro
+     * 
+     * @return void
+     */
+    public function showRegister(): void
+    {
+        // Si ya está autenticado, redirigir al dashboard
+        if (Auth::check()) {
+            $this->redirect('/dashboard');
+            return;
+        }
+
+        // Obtener roles disponibles para registro
+        // Solo mostrar roles que NO sean admin ni portería
+        $rolesDisponibles = $this->usuarioModel->getRolesForRegistration();
+
+        // Renderizar vista de registro sin layout
+        $this->view->setLayout(null);
+        $this->render('auth/register', ['roles' => $rolesDisponibles]);
+    }
+
+    /**
+     * Procesa el formulario de registro
+     * 
+     * Validaciones implementadas:
+     * 1. Verificar método POST
+     * 2. Sanitizar todos los inputs
+     * 3. Validar campos obligatorios
+     * 4. Validar formato de email
+     * 5. Validar longitud mínima de contraseña (8 caracteres)
+     * 6. Verificar coincidencia de contraseñas
+     * 7. Validar unicidad de número de identificación
+     * 8. Validar unicidad de email
+     * 9. Hashear contraseña con password_hash()
+     * 10. Crear usuario en base de datos
+     * 
+     * @return void
+     */
+    public function register(): void
+    {
+        try {
+            // 1. Verificar que el método sea POST
+            if (!$this->isPost()) {
+                $this->redirect('/register');
+                return;
+            }
+
+            // 2. Sanitizar inputs
+            $numero_identificacion = $this->sanitize($this->post('numero_identificacion', ''));
+            $nombres = $this->sanitize($this->post('nombres', ''));
+            $apellidos = $this->sanitize($this->post('apellidos', ''));
+            $email = $this->sanitize($this->post('email', ''));
+            $telefono = $this->sanitize($this->post('telefono', ''));
+            $password = $this->post('password', '');
+            $password_confirm = $this->post('password_confirm', '');
+            $id_rol = (int)$this->post('id_rol', 0);
+
+            // 3. Validar campos obligatorios
+            $errores = [];
+
+            if (empty($numero_identificacion)) {
+                $errores[] = 'El número de identificación es obligatorio';
+            }
+
+            if (empty($nombres)) {
+                $errores[] = 'Los nombres son obligatorios';
+            }
+
+            if (empty($apellidos)) {
+                $errores[] = 'Los apellidos son obligatorios';
+            }
+
+            if (empty($email)) {
+                $errores[] = 'El email es obligatorio';
+            }
+
+            if (empty($password)) {
+                $errores[] = 'La contraseña es obligatoria';
+            }
+
+            if ($id_rol === 0) {
+                $errores[] = 'Debe seleccionar un rol';
+            }
+
+            // 4. Validar formato de email
+            if (!empty($email) && !$this->validateEmail($email)) {
+                $errores[] = 'El formato del email no es válido';
+            }
+
+            // 5. Validar longitud mínima de contraseña (8 caracteres)
+            if (!empty($password) && strlen($password) < 8) {
+                $errores[] = 'La contraseña debe tener al menos 8 caracteres';
+            }
+
+            // 6. Verificar coincidencia de contraseñas
+            if ($password !== $password_confirm) {
+                $errores[] = 'Las contraseñas no coinciden';
+            }
+
+            // Validar que el rol seleccionado no sea admin ni portería
+            if (in_array($id_rol, [1, 6])) {
+                $errores[] = 'No puede seleccionar el rol de Administrador o Portería';
+            }
+
+            // 7. Validar unicidad de número de identificación
+            if ($this->usuarioModel->existsIdentificacion($numero_identificacion)) {
+                $errores[] = 'El número de identificación ya está registrado';
+            }
+
+            // 8. Validar unicidad de email
+            if ($this->usuarioModel->existsEmail($email)) {
+                $errores[] = 'El email ya está registrado';
+            }
+
+            // Si hay errores, retornar al formulario
+            if (!empty($errores)) {
+                Session::flash('error', implode('<br>', $errores));
+                $this->redirect('/register');
+                return;
+            }
+
+            // 9. Hashear contraseña
+            $password_hash = Auth::hashPassword($password);
+
+            // 10. Crear usuario
+            $userData = [
+                'numero_identificacion' => $numero_identificacion,
+                'nombres' => $nombres,
+                'apellidos' => $apellidos,
+                'email' => $email,
+                'telefono' => $telefono,
+                'password_hash' => $password_hash,
+                'id_rol' => $id_rol,
+                'estado' => 'activo'
+            ];
+
+            $userId = $this->usuarioModel->create($userData);
+
+            if ($userId) {
+                Session::flash('success', 'Usuario registrado exitosamente. Por favor, inicie sesión.');
+                $this->redirect('/login');
+            } else {
+                Session::flash('error', 'Error al crear el usuario. Intente nuevamente.');
+                $this->redirect('/register');
+            }
+
+        } catch (\PDOException $e) {
+            error_log("Error en registro (PDO): " . $e->getMessage());
+            Session::flash('error', 'Error del servidor. Por favor, intente más tarde.');
+            $this->redirect('/register');
+        } catch (\Exception $e) {
+            error_log("Error en registro (General): " . $e->getMessage());
+            Session::flash('error', 'Error del servidor. Por favor, intente más tarde.');
+            $this->redirect('/register');
+        }
     }
 }
 

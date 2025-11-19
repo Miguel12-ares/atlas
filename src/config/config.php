@@ -113,19 +113,6 @@ spl_autoload_register(function ($class) {
     }
 });
 
-// Función helper para debugging (solo en desarrollo)
-if (APP_ENV === 'development') {
-    function dd(...$vars) {
-        echo '<pre>';
-        foreach ($vars as $var) {
-            var_dump($var);
-        }
-        echo '</pre>';
-        die();
-    }
-} else {
-    function dd(...$vars) {
-        // En producción no hacer nada
-    }
-}
+// Cargar funciones helper globales
+require_once SRC_PATH . '/Core/helpers.php';
 

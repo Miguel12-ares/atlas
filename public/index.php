@@ -15,8 +15,9 @@ ob_start();
 // Esto permite configurar las opciones de sesión antes de iniciarla
 require_once __DIR__ . '/../src/config/config.php';
 
-// Iniciar sesión (después de cargar config.php)
-session_start();
+// Iniciar sesión avanzada con gestión de tokens (después de cargar config.php)
+use Atlas\Core\Session;
+Session::init();
 
 // Manejo de errores personalizado
 set_error_handler(function($errno, $errstr, $errfile, $errline) {

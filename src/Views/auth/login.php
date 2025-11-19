@@ -346,18 +346,24 @@
         </div>
 
         <!-- Mensajes de error/éxito desde el servidor -->
-        <?php if (isset($_SESSION['error_message'])): ?>
+        <?php
+        use Atlas\Core\Session;
+        Session::init();
+        
+        $errorMsg = Session::getFlash('error');
+        $successMsg = Session::getFlash('success');
+        ?>
+        
+        <?php if ($errorMsg): ?>
             <div class="alert alert-error" role="alert">
-                <?= htmlspecialchars($_SESSION['error_message']) ?>
+                <?= htmlspecialchars($errorMsg) ?>
             </div>
-            <?php unset($_SESSION['error_message']); ?>
         <?php endif; ?>
 
-        <?php if (isset($_SESSION['success_message'])): ?>
+        <?php if ($successMsg): ?>
             <div class="alert alert-success" role="alert">
-                <?= htmlspecialchars($_SESSION['success_message']) ?>
+                <?= htmlspecialchars($successMsg) ?>
             </div>
-            <?php unset($_SESSION['success_message']); ?>
         <?php endif; ?>
 
         <!-- Formulario de login -->
