@@ -12,10 +12,33 @@ namespace Atlas\Controllers;
 
 use Atlas\Core\Controller;
 use Atlas\Core\Auth;
-use Atlas\Core\Helper;
+use Atlas\Models\Usuario;
 
 class AuthController extends Controller
 {
+    /**
+     * Modelo de Usuario
+     * @var Usuario
+     */
+    private Usuario $usuarioModel;
+
+    /**
+     * Mensajes de error constantes
+     */
+    private const ERROR_CREDENCIALES = 'Credenciales incorrectas';
+    private const ERROR_CAMPOS_VACIOS = 'Todos los campos son obligatorios';
+    private const ERROR_SERVIDOR = 'Error del servidor, intenta más tarde';
+
+    /**
+     * Constructor
+     * Inicializa dependencias
+     */
+    public function __construct()
+    {
+        parent::__construct();
+        $this->usuarioModel = new Usuario();
+    }
+
     /**
      * Muestra el formulario de login
      * 
@@ -23,299 +46,180 @@ class AuthController extends Controller
      */
     public function showLogin(): void
     {
-        // Si ya está autenticado, redirigir al dashboard
+        // Si ya está autenticado, redirigir según rol
         if (Auth::check()) {
-            $this->redirect('/dashboard');
+            $this->redirectByRole();
+            return;
         }
 
-        // Renderizar vista de login (por ahora HTML simple)
-        echo $this->renderLoginPage();
+        // Renderizar vista de login sin layout (la vista tiene su propio HTML completo)
+        $this->view->setLayout(null);
+        $this->render('auth/login');
     }
 
     /**
-     * Procesa el login
+     * Procesa el formulario de login
+     * 
+     * Validaciones y pasos según especificación:
+     * 1. Verificar método POST
+     * 2. Sanitizar inputs
+     * 3. Validar campos no vacíos
+     * 4. Consultar base de datos
+     * 5. Verificar contraseña
+     * 6. Crear sesión y redireccionar
      * 
      * @return void
      */
     public function login(): void
     {
+        try {
+            // 1. Verificar que el método sea POST
         if (!$this->isPost()) {
             $this->redirect('/login');
-        }
+                return;
+            }
 
-        $email = $this->post('email', '');
+            // 2. Sanitizar inputs con htmlspecialchars() 
+            // (FILTER_SANITIZE_STRING está deprecado desde PHP 8.1)
+            $numero_identificacion = htmlspecialchars(
+                strip_tags(trim($this->post('numero_identificacion', ''))),
+                ENT_QUOTES,
+                'UTF-8'
+            );
+            
         $password = $this->post('password', '');
 
-        // Validar campos
-        if (empty($email) || empty($password)) {
-            $_SESSION['error_message'] = 'Por favor, completa todos los campos';
+            // 3. Validar que los campos no estén vacíos
+            if (empty($numero_identificacion) || empty($password)) {
+                $_SESSION['error_message'] = self::ERROR_CAMPOS_VACIOS;
+                $this->redirect('/login');
+                return;
+            }
+
+            // 4. Consultar base de datos usando el modelo Usuario
+            $usuario = $this->usuarioModel->findByIdentificacion($numero_identificacion);
+
+            // Si el usuario NO existe, retornar error genérico por seguridad
+            if (!$usuario) {
+                $_SESSION['error_message'] = self::ERROR_CREDENCIALES;
+                $this->redirect('/login');
+                return;
+            }
+
+            // 5. Verificar contraseña usando password_verify
+            if (!password_verify($password, $usuario['password_hash'])) {
+                $_SESSION['error_message'] = self::ERROR_CREDENCIALES;
+                $this->redirect('/login');
+                return;
+            }
+
+            // 6. Login exitoso - Configurar sesión
+            $this->establecerSesion($usuario);
+
+            // Redireccionar según rol
+            $this->redirectByRole();
+
+        } catch (\PDOException $e) {
+            // Manejo de errores de base de datos
+            error_log("Error en login (PDO): " . $e->getMessage());
+            $_SESSION['error_message'] = self::ERROR_SERVIDOR;
+            $this->redirect('/login');
+        } catch (\Exception $e) {
+            // Manejo de cualquier otra excepción
+            error_log("Error en login (General): " . $e->getMessage());
+            $_SESSION['error_message'] = self::ERROR_SERVIDOR;
             $this->redirect('/login');
         }
+    }
 
-        // Intentar autenticación
-        if (Auth::attempt($email, $password)) {
-            $_SESSION['success_message'] = '¡Bienvenido al Sistema Atlas!';
-            $this->redirect('/dashboard');
-        } else {
-            $_SESSION['error_message'] = 'Credenciales incorrectas';
-            $this->redirect('/login');
+    /**
+     * Establece la sesión del usuario
+     * Almacena datos en $_SESSION y regenera ID por seguridad
+     * 
+     * @param array $usuario Datos del usuario
+     * @return void
+     */
+    private function establecerSesion(array $usuario): void
+    {
+        // Regenerar ID de sesión para prevenir session fixation
+        // La sesión ya fue iniciada en public/index.php
+        session_regenerate_id(true);
+
+        // Almacenar datos del usuario en $_SESSION
+        $_SESSION['user_id'] = $usuario['id_usuario'];
+        $_SESSION['numero_identificacion'] = $usuario['numero_identificacion'];
+        $_SESSION['nombres'] = $usuario['nombres'];
+        $_SESSION['apellidos'] = $usuario['apellidos'];
+        $_SESSION['rol_id'] = $usuario['id_rol'];
+        $_SESSION['rol_nombre'] = $usuario['nombre_rol'];
+        $_SESSION['logged_in'] = true;
+
+        // Almacenar timestamp de login
+        $_SESSION['login_time'] = time();
+
+        // Establecer mensaje de éxito
+        $_SESSION['success_message'] = '¡Bienvenido, ' . $usuario['nombres'] . '!';
+    }
+
+    /**
+     * Redirecciona al usuario según su rol
+     * 
+     * - admin o administrativo → /admin/dashboard.php
+     * - porteria → /porteria/scan.php
+     * - instructor, aprendiz, civil → /equipos/index.php
+     * 
+     * @return void
+     */
+    private function redirectByRole(): void
+    {
+        $rol = Auth::role();
+
+        switch ($rol) {
+            case 'admin':
+            case 'administrativo':
+                // Por ahora redirigir a /dashboard, después crear /admin/dashboard.php
+                $this->redirect('/dashboard');
+                break;
+
+            case 'porteria':
+                // Por ahora redirigir a /dashboard, después crear /porteria/scan.php
+                $this->redirect('/dashboard');
+                break;
+
+            case 'instructor':
+            case 'aprendiz':
+            case 'civil':
+                // Por ahora redirigir a /dashboard, después crear /equipos/index.php
+                $this->redirect('/dashboard');
+                break;
+
+            default:
+                // Fallback por si acaso
+                $this->redirect('/dashboard');
+                break;
         }
     }
 
     /**
      * Cierra la sesión del usuario
+     * Destruye la sesión y redirecciona al login
      * 
      * @return void
      */
     public function logout(): void
     {
+        // Destruir sesión usando la clase Auth
         Auth::logout();
+        
+        // Reiniciar sesión para establecer mensaje de éxito
+        // (Auth::logout() destruye la sesión, necesitamos reiniciarla)
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
         $_SESSION['success_message'] = 'Sesión cerrada correctamente';
+        
+        // Redireccionar al login
         $this->redirect('/login');
-    }
-
-    /**
-     * Renderiza la página de login (temporal hasta crear la vista)
-     * 
-     * @return string HTML del login
-     */
-    private function renderLoginPage(): string
-    {
-        ob_start();
-        ?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Sistema Atlas</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #39A900 0%, #5DBF1A 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        
-        .login-container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            width: 100%;
-            max-width: 420px;
-            padding: 40px;
-        }
-        
-        .logo {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .logo h1 {
-            font-size: 2rem;
-            color: #39A900;
-            margin-bottom: 10px;
-        }
-        
-        .logo p {
-            color: #666;
-            font-size: 0.95rem;
-        }
-        
-        .alert {
-            padding: 12px 16px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-        }
-        
-        .alert-error {
-            background-color: #fee;
-            border-left: 4px solid #dc3545;
-            color: #721c24;
-        }
-        
-        .alert-success {
-            background-color: #d4edda;
-            border-left: 4px solid #28a745;
-            color: #155724;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 600;
-            font-size: 0.95rem;
-        }
-        
-        input[type="email"],
-        input[type="password"] {
-            width: 100%;
-            padding: 12px 16px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 1rem;
-            transition: border-color 0.3s;
-        }
-        
-        input[type="email"]:focus,
-        input[type="password"]:focus {
-            outline: none;
-            border-color: #39A900;
-        }
-        
-        .btn {
-            width: 100%;
-            padding: 14px;
-            background: #39A900;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(57, 169, 0, 0.4);
-            background: #2D8400;
-        }
-        
-        .demo-credentials {
-            margin-top: 30px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            border-left: 4px solid #17a2b8;
-        }
-        
-        .demo-credentials h3 {
-            color: #39A900;
-            font-size: 0.9rem;
-            margin-bottom: 12px;
-        }
-        
-        .demo-credentials table {
-            width: 100%;
-            font-size: 0.85rem;
-            border-collapse: collapse;
-        }
-        
-        .demo-credentials td {
-            padding: 6px 0;
-        }
-        
-        .demo-credentials td:first-child {
-            color: #666;
-            font-weight: 600;
-        }
-        
-        .demo-credentials td:last-child {
-            color: #333;
-        }
-        
-        .divider {
-            margin: 15px 0;
-            border-top: 1px solid #ddd;
-        }
-    </style>
-</head>
-<body>
-    <div class="login-container">
-        <div class="logo">
-            <h1>🎓 Sistema Atlas</h1>
-            <p>Control de Acceso de Equipos</p>
-        </div>
-
-        <?php if (isset($_SESSION['error_message'])): ?>
-            <div class="alert alert-error">
-                <?= htmlspecialchars($_SESSION['error_message']) ?>
-            </div>
-            <?php unset($_SESSION['error_message']); ?>
-        <?php endif; ?>
-
-        <?php if (isset($_SESSION['success_message'])): ?>
-            <div class="alert alert-success">
-                <?= htmlspecialchars($_SESSION['success_message']) ?>
-            </div>
-            <?php unset($_SESSION['success_message']); ?>
-        <?php endif; ?>
-
-        <form method="POST" action="/login">
-            <div class="form-group">
-                <label for="email">Correo Electrónico</label>
-                <input type="email" id="email" name="email" required placeholder="usuario@atlas.sena">
-            </div>
-
-            <div class="form-group">
-                <label for="password">Contraseña</label>
-                <input type="password" id="password" name="password" required placeholder="••••••••">
-            </div>
-
-            <button type="submit" class="btn">Iniciar Sesión</button>
-        </form>
-
-        <div class="demo-credentials">
-            <h3>👤 Usuarios de Prueba</h3>
-            <table>
-                <tr>
-                    <td><strong>Admin:</strong></td>
-                    <td>admin@atlas.sena</td>
-                </tr>
-                <tr>
-                    <td></td>
-                    <td>Password: <code>admin123</code></td>
-                </tr>
-                <tr><td colspan="2"><div class="divider"></div></td></tr>
-                <tr>
-                    <td><strong>Portero:</strong></td>
-                    <td>portero@atlas.sena</td>
-                </tr>
-                <tr>
-                    <td></td>
-                    <td>Password: <code>portero123</code></td>
-                </tr>
-                <tr><td colspan="2"><div class="divider"></div></td></tr>
-                <tr>
-                    <td><strong>Instructor:</strong></td>
-                    <td>maria.lopez@sena.edu.co</td>
-                </tr>
-                <tr>
-                    <td></td>
-                    <td>Password: <code>instructor123</code></td>
-                </tr>
-                <tr><td colspan="2"><div class="divider"></div></td></tr>
-                <tr>
-                    <td><strong>Aprendiz:</strong></td>
-                    <td>juan.perez@sena.edu.co</td>
-                </tr>
-                <tr>
-                    <td></td>
-                    <td>Password: <code>aprendiz123</code></td>
-                </tr>
-            </table>
-        </div>
-    </div>
-</body>
-</html>
-        <?php
-        return ob_get_clean();
     }
 }
 

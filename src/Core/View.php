@@ -20,9 +20,9 @@ class View
 
     /**
      * Layout por defecto
-     * @var string
+     * @var string|null
      */
-    private string $layout = 'layouts/main';
+    private ?string $layout = 'layouts/main';
 
     /**
      * Datos a pasar a la vista
@@ -33,10 +33,10 @@ class View
     /**
      * Establece el layout a utilizar
      * 
-     * @param string $layout Nombre del layout
+     * @param string|null $layout Nombre del layout o null para no usar layout
      * @return void
      */
-    public function setLayout(string $layout): void
+    public function setLayout(?string $layout): void
     {
         $this->layout = $layout;
     }

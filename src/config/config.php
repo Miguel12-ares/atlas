@@ -12,8 +12,21 @@
 date_default_timezone_set('America/Bogota');
 
 // Configuración de errores (cambiar en producción)
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+// Excluir E_DEPRECATED para PHP 8.1+ (evita warnings molestos en desarrollo)
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+ini_set('display_errors', 0); // No mostrar errores directamente (usar logs)
+ini_set('log_errors', 1); // Habilitar log de errores
+
+// IMPORTANTE: Configurar opciones de sesión ANTES de session_start()
+// Estas configuraciones deben establecerse antes de iniciar la sesión
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.cookie_httponly', 1); // Prevenir acceso a cookies desde JavaScript
+    ini_set('session.use_only_cookies', 1); // Solo usar cookies para sesiones
+    ini_set('session.cookie_secure', 0); // Cambiar a 1 en producción con HTTPS
+    ini_set('session.cookie_samesite', 'Lax'); // Protección CSRF
+    ini_set('session.gc_maxlifetime', 7200); // 2 horas
+    ini_set('session.cookie_lifetime', 0); // Cookie de sesión (expira al cerrar navegador)
+}
 
 // Constantes de la aplicación
 define('APP_NAME', 'Sistema Atlas');

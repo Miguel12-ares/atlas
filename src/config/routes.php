@@ -16,17 +16,13 @@ $router = new Router();
 // RUTAS PÚBLICAS
 // =====================================================
 
-// Página de inicio
-$router->get('/', function() {
-    echo "<h1>Sistema Atlas - Control de Acceso de Equipos</h1>";
-    echo "<p>Bienvenido al Sistema Atlas</p>";
-    echo "<p><a href='/login'>Iniciar Sesión</a></p>";
-});
-
-// Autenticación
+// Autenticación (ambas rutas soportadas)
+$router->get('/', 'AuthController@showLogin');
 $router->get('/login', 'AuthController@showLogin');
 $router->post('/login', 'AuthController@login');
+$router->post('/auth/login', 'AuthController@login');
 $router->get('/logout', 'AuthController@logout');
+$router->get('/auth/logout', 'AuthController@logout');
 
 // =====================================================
 // RUTAS PROTEGIDAS - DASHBOARD

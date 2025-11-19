@@ -29,7 +29,7 @@ Sistema web de control de acceso de equipos para instituciones educativas del SE
 
 ### 1. Clonar el repositorio
 ```bash
-git clone https://github.com/tu-usuario/atlas.git
+git clone https://github.com/Miguel12-ares/atlas.git
 cd atlas
 ```
 

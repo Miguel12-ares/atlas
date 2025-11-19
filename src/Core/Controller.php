@@ -47,6 +47,11 @@ class Controller
      */
     protected function redirect(string $url): void
     {
+        // Limpiar cualquier output buffer antes de redirigir
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         header("Location: " . $url);
         exit;
     }

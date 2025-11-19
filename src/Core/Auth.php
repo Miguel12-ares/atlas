@@ -31,23 +31,23 @@ class Auth
     }
 
     /**
-     * Intenta autenticar un usuario
+     * Intenta autenticar un usuario por número de identificación
      * 
-     * @param string $email Email del usuario
+     * @param string $numero_identificacion Número de identificación del usuario
      * @param string $password Contraseña
      * @return bool True si la autenticación fue exitosa
      */
-    public static function attempt(string $email, string $password): bool
+    public static function attempt(string $numero_identificacion, string $password): bool
     {
         $db = Database::getInstance();
         
         $sql = "SELECT u.*, r.nombre_rol, r.puede_tener_equipo 
                 FROM usuarios u 
                 INNER JOIN roles r ON u.id_rol = r.id_rol 
-                WHERE u.email = ? AND u.estado = 'activo' 
+                WHERE u.numero_identificacion = ? AND u.estado = 'activo' 
                 LIMIT 1";
         
-        $user = $db->fetch($sql, [$email]);
+        $user = $db->fetch($sql, [$numero_identificacion]);
 
         if ($user && password_verify($password, $user['password_hash'])) {
             // Remover password del array antes de guardar en sesión
@@ -83,7 +83,19 @@ class Auth
     public static function logout(): void
     {
         self::startSession();
+        
+        // Limpiar ambos formatos de sesión
         unset($_SESSION[self::SESSION_NAME]);
+        unset($_SESSION['user_id']);
+        unset($_SESSION['numero_identificacion']);
+        unset($_SESSION['nombres']);
+        unset($_SESSION['apellidos']);
+        unset($_SESSION['rol_id']);
+        unset($_SESSION['rol_nombre']);
+        unset($_SESSION['logged_in']);
+        unset($_SESSION['login_time']);
+        
+        // Destruir la sesión completamente
         session_destroy();
     }
 
@@ -95,7 +107,8 @@ class Auth
     public static function check(): bool
     {
         self::startSession();
-        return isset($_SESSION[self::SESSION_NAME]);
+        // Verificar ambos métodos de almacenamiento (compatibilidad)
+        return isset($_SESSION[self::SESSION_NAME]) || isset($_SESSION['logged_in']);
     }
 
     /**
@@ -106,7 +119,25 @@ class Auth
     public static function user(): ?array
     {
         self::startSession();
-        return $_SESSION[self::SESSION_NAME] ?? null;
+        
+        // Si existe en el formato antiguo, retornarlo
+        if (isset($_SESSION[self::SESSION_NAME])) {
+            return $_SESSION[self::SESSION_NAME];
+        }
+        
+        // Si existe en el formato nuevo (variables individuales), construir array
+        if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
+            return [
+                'id_usuario' => $_SESSION['user_id'] ?? null,
+                'numero_identificacion' => $_SESSION['numero_identificacion'] ?? null,
+                'nombres' => $_SESSION['nombres'] ?? null,
+                'apellidos' => $_SESSION['apellidos'] ?? null,
+                'id_rol' => $_SESSION['rol_id'] ?? null,
+                'nombre_rol' => $_SESSION['rol_nombre'] ?? null,
+            ];
+        }
+        
+        return null;
     }
 
     /**
@@ -116,8 +147,9 @@ class Auth
      */
     public static function id(): ?int
     {
-        $user = self::user();
-        return $user['id_usuario'] ?? null;
+        self::startSession();
+        // Leer directamente de $_SESSION para mejor rendimiento
+        return $_SESSION['user_id'] ?? null;
     }
 
     /**
@@ -127,8 +159,9 @@ class Auth
      */
     public static function role(): ?string
     {
-        $user = self::user();
-        return $user['nombre_rol'] ?? null;
+        self::startSession();
+        // Leer directamente de $_SESSION para mejor rendimiento
+        return $_SESSION['rol_nombre'] ?? null;
     }
 
     /**
@@ -155,11 +188,23 @@ class Auth
 
     /**
      * Requiere autenticación, redirige si no está autenticado
+     * (Alias para compatibilidad)
      * 
      * @param string $redirectUrl URL de redirección
      * @return void
      */
     public static function requireAuth(string $redirectUrl = '/login'): void
+    {
+        self::requireLogin($redirectUrl);
+    }
+
+    /**
+     * Requiere que haya un usuario autenticado, redirige si no lo hay
+     * 
+     * @param string $redirectUrl URL de redirección
+     * @return void
+     */
+    public static function requireLogin(string $redirectUrl = '/login'): void
     {
         if (!self::check()) {
             header("Location: {$redirectUrl}");
