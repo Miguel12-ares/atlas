@@ -24,6 +24,12 @@ $router->post('/auth/login', 'AuthController@login');
 $router->get('/logout', 'AuthController@logout');
 $router->get('/auth/logout', 'AuthController@logout');
 
+// Registro de usuarios
+$router->get('/register', 'AuthController@showRegister');
+$router->post('/register', 'AuthController@register');
+$router->get('/auth/register', 'AuthController@showRegister');
+$router->post('/auth/register', 'AuthController@register');
+
 // =====================================================
 // RUTAS PROTEGIDAS - DASHBOARD
 // =====================================================
@@ -38,19 +44,19 @@ $router->get('/dashboard', 'DashboardController@index');
 // Listar usuarios
 $router->get('/usuarios', 'UsuarioController@index');
 
-// Ver usuario
-$router->get('/usuarios/{id}', 'UsuarioController@show');
-
-// Crear usuario
+// Crear usuario (DEBE IR ANTES de {id})
 $router->get('/usuarios/crear', 'UsuarioController@create');
 $router->post('/usuarios/crear', 'UsuarioController@store');
 
-// Editar usuario
+// Editar usuario (rutas específicas antes de show)
 $router->get('/usuarios/{id}/editar', 'UsuarioController@edit');
 $router->post('/usuarios/{id}/editar', 'UsuarioController@update');
 
 // Eliminar usuario
 $router->post('/usuarios/{id}/eliminar', 'UsuarioController@delete');
+
+// Ver usuario (DEBE IR AL FINAL)
+$router->get('/usuarios/{id}', 'UsuarioController@show');
 
 // =====================================================
 // RUTAS PROTEGIDAS - EQUIPOS
@@ -59,14 +65,11 @@ $router->post('/usuarios/{id}/eliminar', 'UsuarioController@delete');
 // Listar equipos
 $router->get('/equipos', 'EquipoController@index');
 
-// Ver equipo
-$router->get('/equipos/{id}', 'EquipoController@show');
-
-// Crear equipo
+// Crear equipo (DEBE IR ANTES de {id})
 $router->get('/equipos/crear', 'EquipoController@create');
 $router->post('/equipos/crear', 'EquipoController@store');
 
-// Editar equipo
+// Editar equipo (rutas específicas antes de show)
 $router->get('/equipos/{id}/editar', 'EquipoController@edit');
 $router->post('/equipos/{id}/editar', 'EquipoController@update');
 
@@ -76,6 +79,9 @@ $router->post('/equipos/{id}/eliminar', 'EquipoController@delete');
 // Generar código QR
 $router->post('/equipos/{id}/generar-qr', 'EquipoController@generateQR');
 
+// Ver equipo (DEBE IR AL FINAL)
+$router->get('/equipos/{id}', 'EquipoController@show');
+
 // =====================================================
 // RUTAS PROTEGIDAS - REGISTROS DE ACCESO
 // =====================================================
@@ -83,15 +89,15 @@ $router->post('/equipos/{id}/generar-qr', 'EquipoController@generateQR');
 // Listar registros
 $router->get('/registros', 'RegistroController@index');
 
-// Ver registro
-$router->get('/registros/{id}', 'RegistroController@show');
-
-// Crear registro (entrada/salida)
+// Crear registro (entrada/salida) - DEBE IR ANTES de {id}
 $router->get('/registros/crear', 'RegistroController@create');
 $router->post('/registros/crear', 'RegistroController@store');
 
 // Registro por QR
 $router->post('/registros/qr', 'RegistroController@storeByQR');
+
+// Ver registro (DEBE IR AL FINAL)
+$router->get('/registros/{id}', 'RegistroController@show');
 
 // =====================================================
 // RUTAS PROTEGIDAS - ANOMALÍAS
@@ -100,11 +106,11 @@ $router->post('/registros/qr', 'RegistroController@storeByQR');
 // Listar anomalías
 $router->get('/anomalias', 'AnomaliaController@index');
 
-// Ver anomalía
-$router->get('/anomalias/{id}', 'AnomaliaController@show');
-
-// Resolver anomalía
+// Resolver anomalía (ruta específica antes de show)
 $router->post('/anomalias/{id}/resolver', 'AnomaliaController@resolve');
+
+// Ver anomalía (DEBE IR AL FINAL)
+$router->get('/anomalias/{id}', 'AnomaliaController@show');
 
 // =====================================================
 // RUTAS PROTEGIDAS - REPORTES
