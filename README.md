@@ -5,12 +5,14 @@ Sistema web de control de acceso de equipos para instituciones educativas del SE
 ## 📋 Características
 
 - ✅ **Gestión de Usuarios**: Sistema de roles (admin, administrativo, instructor, aprendiz, civil, portería)
-- ✅ **Registro de Equipos**: Control completo con imágenes y códigos QR
-- ✅ **Control de Acceso**: Registro de entradas/salidas
-- ✅ **Detección de Anomalías**: Sistema de alertas
-- ✅ **Configuración de Horarios**: Control basado en horarios
-- ✅ **Reportes**: Generación de reportes
-- ✅ **RBAC**: Control de acceso basado en roles
+- ✅ **Registro de Equipos**: Control completo con imágenes y códigos QR (FASE 3 COMPLETADA)
+- ✅ **Gestión de Imágenes**: Subida múltiple, redimensionamiento automático, gestión de galería
+- ✅ **Códigos QR**: Generación automática de códigos QR únicos por equipo
+- 🚧 **Control de Acceso**: Registro de entradas/salidas (Fase 4)
+- 🚧 **Detección de Anomalías**: Sistema de alertas (Fase 4)
+- 🚧 **Configuración de Horarios**: Control basado en horarios (Fase 5)
+- 🚧 **Reportes**: Generación de reportes (Fase 6)
+- ✅ **RBAC**: Control de acceso basado en roles y permisos
 
 ## 🛠️ Stack Tecnológico
 
@@ -85,15 +87,15 @@ atlas/
 ## 🗄️ Base de Datos
 
 9 tablas en Tercera Forma Normal (3NF):
-- roles
-- usuarios
-- equipos
-- imagenes_equipo
-- codigos_qr
-- registros_acceso
-- anomalias
-- configuracion_horario
-- sesiones
+- ✅ **roles** - Catálogo de roles del sistema
+- ✅ **usuarios** - Información de usuarios
+- ✅ **equipos** - Registro de equipos electrónicos (FASE 3)
+- ✅ **imagenes_equipo** - Almacenamiento de imágenes (FASE 3)
+- ✅ **codigos_qr** - Códigos QR generados (FASE 3)
+- 🚧 **registros_acceso** - Registro de entradas/salidas (Fase 4)
+- 🚧 **anomalias** - Detección de anomalías (Fase 4)
+- 🚧 **configuracion_horario** - Configuración de horarios (Fase 5)
+- ✅ **sesiones** - Gestión de sesiones
 
 ## 🔧 Comandos Útiles
 
@@ -132,6 +134,44 @@ docker exec -it atlas_mysql mysql -uroot -patlas_root_2024 atlas_db
 - ✅ Control de acceso por roles (RBAC)
 - ✅ Sesiones seguras
 - ✅ Headers de seguridad
+
+## 📈 Estado del Proyecto
+
+### Fases Completadas
+
+#### ✅ Fase 1: Configuración Inicial
+- Configuración de Docker
+- Esquema de base de datos
+- Arquitectura MVC nativa
+- Sistema de rutas
+
+#### ✅ Fase 2: Autenticación y Roles
+- Sistema de login/registro
+- Gestión de sesiones
+- RBAC completo
+- Middleware de permisos
+- Dashboard funcional
+
+#### ✅ Fase 3: Gestión de Equipos (COMPLETADA - 19/11/2025)
+- ✅ Modelo Equipo con CRUD completo
+- ✅ Modelo ImagenEquipo
+- ✅ Modelo CodigoQR
+- ✅ Formulario de registro con validación
+- ✅ Subida múltiple de imágenes (max 5)
+- ✅ Redimensionamiento automático de imágenes
+- ✅ Generador de códigos QR
+- ✅ Vista de listado con filtros
+- ✅ Vista de detalle de equipo
+- ✅ Edición de equipos
+- ✅ Eliminación suave (soft delete)
+- ✅ Sistema de permisos por propietario/admin
+
+Ver documentación completa en: [`docs/FASE_3_COMPLETADA.md`](docs/FASE_3_COMPLETADA.md)
+
+#### 🚧 Próximas Fases
+- **Fase 4**: Sistema de Registro de Accesos
+- **Fase 5**: Códigos QR y Detección de Anomalías
+- **Fase 6**: Reportes y Configuración de Horarios
 
 ## 🎨 Colores del SENA
 

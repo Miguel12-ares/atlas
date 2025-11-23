@@ -1,0 +1,201 @@
+/**
+ * Sistema Atlas - Estilos de Equipos
+ * Módulo de gestión de equipos
+ */
+
+/* Grid de equipos */
+.equipos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+/* Tarjetas de equipos */
+.equipo-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.equipo-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(57, 169, 0, 0.2);
+}
+
+/* Imagen del equipo */
+.equipo-imagen {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: linear-gradient(135deg, #E8F5E0 0%, #C8E6C9 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    color: #39A900;
+}
+
+.equipo-imagen img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Contenido de la tarjeta */
+.equipo-body {
+    padding: 1.5rem;
+}
+
+.equipo-marca {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #39A900;
+    margin-bottom: 0.5rem;
+}
+
+.equipo-modelo {
+    font-size: 1rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+.equipo-serie {
+    font-size: 0.9rem;
+    color: #999;
+    margin-bottom: 1rem;
+    font-family: monospace;
+}
+
+/* Estados del equipo */
+.equipo-estado {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.estado-activo {
+    background: #d4edda;
+    color: #155724;
+}
+
+.estado-inactivo {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.estado-bloqueado {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.estado-en_revision {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+/* Acciones del equipo */
+.equipo-acciones {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Botones pequeños */
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    text-decoration: none;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-info {
+    background: #17a2b8;
+    color: white;
+}
+
+.btn-warning {
+    background: #ffc107;
+    color: #333;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-sm:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+}
+
+/* Contenedor de filtros */
+.filtros-container {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.filtros-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    align-items: end;
+}
+
+/* Estado vacío */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.empty-state-icon {
+    font-size: 5rem;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    color: #39A900;
+    margin-bottom: 1rem;
+}
+
+/* Header de página */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.page-header h2 {
+    color: #39A900;
+    font-size: 2rem;
+    margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .equipos-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+}
+
