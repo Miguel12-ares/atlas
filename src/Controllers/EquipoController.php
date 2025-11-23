@@ -13,15 +13,40 @@ namespace Atlas\Controllers;
 use Atlas\Core\Controller;
 use Atlas\Core\Auth;
 use Atlas\Core\Middleware;
+use Atlas\Core\QRCodeGenerator;
+use Atlas\Models\Equipo;
+use Atlas\Models\ImagenEquipo;
+use Atlas\Models\CodigoQR;
 
 class EquipoController extends Controller
 {
+    /**
+     * Modelo de Equipo
+     * @var Equipo
+     */
+    private Equipo $equipoModel;
+
+    /**
+     * Modelo de ImagenEquipo
+     * @var ImagenEquipo
+     */
+    private ImagenEquipo $imagenModel;
+
+    /**
+     * Modelo de CodigoQR
+     * @var CodigoQR
+     */
+    private CodigoQR $qrModel;
+
     /**
      * Constructor
      */
     public function __construct()
     {
         parent::__construct();
+        $this->equipoModel = new Equipo();
+        $this->imagenModel = new ImagenEquipo();
+        $this->qrModel = new CodigoQR();
     }
 
     /**
@@ -31,14 +56,36 @@ class EquipoController extends Controller
      */
     public function index(): void
     {
-        // Verificar autenticación
         Auth::requireAuth('/login');
-
-        // Verificar permisos
         Middleware::requirePermission('equipos.leer');
 
-        // Por ahora, mostrar página en construcción
-        $this->renderEnConstruccion('Gestión de Equipos');
+        $user = Auth::user();
+        $id_usuario = $user['id_usuario'];
+        
+        // Obtener filtros
+        $filters = [
+            'marca' => $_GET['marca'] ?? '',
+            'modelo' => $_GET['modelo'] ?? '',
+            'numero_serie' => $_GET['numero_serie'] ?? '',
+            'estado_equipo' => $_GET['estado_equipo'] ?? ''
+        ];
+
+        // Si es admin, mostrar todos los equipos, sino solo los del usuario
+        if (in_array($user['nombre_rol'], ['Administrador', 'Administrativo'])) {
+            $equipos = $this->equipoModel->search($filters);
+            $stats = null;
+        } else {
+            $equipos = $this->equipoModel->search($filters, $id_usuario);
+            $stats = $this->equipoModel->getStatsForUser($id_usuario);
+        }
+
+        $this->render('equipos/index', [
+            'title' => 'Mis Equipos',
+            'styles' => ['equipos.css'],
+            'user' => $user,
+            'equipos' => $equipos,
+            'stats' => $stats
+        ]);
     }
 
     /**
@@ -49,14 +96,45 @@ class EquipoController extends Controller
      */
     public function show(int $id): void
     {
-        // Verificar autenticación
         Auth::requireAuth('/login');
-
-        // Verificar permisos
         Middleware::requirePermission('equipos.leer');
 
-        // Por ahora, mostrar página en construcción
-        $this->renderEnConstruccion('Detalle de Equipo');
+        $user = Auth::user();
+        $equipo = $this->equipoModel->getWithDetails($id);
+
+        if (!$equipo) {
+            $_SESSION['error_message'] = 'Equipo no encontrado';
+            $this->redirect('/equipos');
+            return;
+        }
+
+        // Verificar que el usuario puede ver este equipo
+        $es_propietario = $equipo['id_usuario'] == $user['id_usuario'];
+        $es_admin = in_array($user['nombre_rol'], ['Administrador', 'Administrativo']);
+
+        if (!$es_propietario && !$es_admin) {
+            $_SESSION['error_message'] = 'No tienes permiso para ver este equipo';
+            $this->redirect('/equipos');
+            return;
+        }
+
+        // Obtener imágenes del equipo
+        $imagenes = $this->imagenModel->getByEquipo($id);
+
+        // Obtener estado actual
+        $estado_actual = $this->equipoModel->getEstadoActual($id);
+
+        $this->render('equipos/show', [
+            'title' => 'Detalle del Equipo',
+            'styles' => ['equipos-detail.css'],
+            'scripts' => [],
+            'user' => $user,
+            'equipo' => $equipo,
+            'imagenes' => $imagenes,
+            'estado_actual' => $estado_actual,
+            'es_propietario' => $es_propietario,
+            'es_admin' => $es_admin
+        ]);
     }
 
     /**
@@ -66,14 +144,17 @@ class EquipoController extends Controller
      */
     public function create(): void
     {
-        // Verificar autenticación
         Auth::requireAuth('/login');
-
-        // Verificar permisos
         Middleware::requirePermission('equipos.crear');
 
-        // Por ahora, mostrar página en construcción
-        $this->renderEnConstruccion('Registrar Equipo');
+        $user = Auth::user();
+
+        $this->render('equipos/create', [
+            'title' => 'Registrar Equipo',
+            'styles' => ['equipos-form.css'],
+            'scripts' => ['equipo-form.js'],
+            'user' => $user
+        ]);
     }
 
     /**
@@ -83,17 +164,59 @@ class EquipoController extends Controller
      */
     public function store(): void
     {
-        // Verificar autenticación
         Auth::requireAuth('/login');
-
-        // Verificar permisos
         Middleware::requirePermission('equipos.crear');
 
-        // TODO: Implementar en Fase 3
-        $this->json([
-            'success' => false,
-            'message' => 'Funcionalidad en desarrollo - Fase 3'
-        ], 501);
+        if (!$this->isPost()) {
+            $this->redirect('/equipos/crear');
+            return;
+        }
+
+        $user = Auth::user();
+
+        // Validar datos
+        $numero_serie = $this->sanitize($this->post('numero_serie', ''));
+        $marca = $this->sanitize($this->post('marca', ''));
+        $modelo = $this->sanitize($this->post('modelo', ''));
+        $descripcion = $this->sanitize($this->post('descripcion', ''));
+
+        // Validaciones
+        if (empty($numero_serie) || empty($marca) || empty($modelo)) {
+            $_SESSION['error_message'] = 'Todos los campos obligatorios deben estar completos';
+            $this->redirect('/equipos/crear');
+            return;
+        }
+
+        // Verificar unicidad del número de serie
+        if ($this->equipoModel->numeroSerieExists($numero_serie)) {
+            $_SESSION['error_message'] = 'El número de serie ya existe en el sistema';
+            $this->redirect('/equipos/crear');
+            return;
+        }
+
+        // Crear el equipo
+        $equipo_id = $this->equipoModel->create([
+            'id_usuario' => $user['id_usuario'],
+            'numero_serie' => $numero_serie,
+            'marca' => $marca,
+            'modelo' => $modelo,
+            'descripcion' => $descripcion,
+            'estado_equipo' => 'activo'
+        ]);
+
+        if (!$equipo_id) {
+            $_SESSION['error_message'] = 'Error al registrar el equipo';
+            $this->redirect('/equipos/crear');
+            return;
+        }
+
+        // Procesar imágenes si hay
+        if (!empty($_FILES['imagenes']['name'][0])) {
+            $this->uploadImages($equipo_id, $_FILES['imagenes']);
+        }
+
+        $_SESSION['success_message'] = 'Equipo registrado exitosamente';
+        $this->redirect('/equipos/' . $equipo_id);
     }
 
     /**
@@ -104,14 +227,36 @@ class EquipoController extends Controller
      */
     public function edit(int $id): void
     {
-        // Verificar autenticación
         Auth::requireAuth('/login');
-
-        // Verificar permisos
         Middleware::requirePermission('equipos.actualizar');
 
-        // Por ahora, mostrar página en construcción
-        $this->renderEnConstruccion('Editar Equipo');
+        $user = Auth::user();
+        $equipo = $this->equipoModel->getWithDetails($id);
+
+        if (!$equipo) {
+            $_SESSION['error_message'] = 'Equipo no encontrado';
+            $this->redirect('/equipos');
+            return;
+        }
+
+        // Verificar que el usuario puede editar este equipo
+        $es_propietario = $equipo['id_usuario'] == $user['id_usuario'];
+        $es_admin = in_array($user['nombre_rol'], ['Administrador', 'Administrativo']);
+
+        if (!$es_propietario && !$es_admin) {
+            $_SESSION['error_message'] = 'No tienes permiso para editar este equipo';
+            $this->redirect('/equipos');
+            return;
+        }
+
+        // Obtener imágenes del equipo
+        $imagenes = $this->imagenModel->getByEquipo($id);
+
+        $this->render('equipos/edit', [
+            'user' => $user,
+            'equipo' => $equipo,
+            'imagenes' => $imagenes
+        ]);
     }
 
     /**
@@ -122,38 +267,142 @@ class EquipoController extends Controller
      */
     public function update(int $id): void
     {
-        // Verificar autenticación
         Auth::requireAuth('/login');
-
-        // Verificar permisos
         Middleware::requirePermission('equipos.actualizar');
 
-        // TODO: Implementar en Fase 3
-        $this->json([
-            'success' => false,
-            'message' => 'Funcionalidad en desarrollo - Fase 3'
-        ], 501);
+        if (!$this->isPost()) {
+            $this->redirect('/equipos/' . $id . '/editar');
+            return;
+        }
+
+        $user = Auth::user();
+        $equipo = $this->equipoModel->find($id);
+
+        if (!$equipo) {
+            $_SESSION['error_message'] = 'Equipo no encontrado';
+            $this->redirect('/equipos');
+            return;
+        }
+
+        // Verificar permisos
+        $es_propietario = $equipo['id_usuario'] == $user['id_usuario'];
+        $es_admin = in_array($user['nombre_rol'], ['Administrador', 'Administrativo']);
+
+        if (!$es_propietario && !$es_admin) {
+            $_SESSION['error_message'] = 'No tienes permiso para editar este equipo';
+            $this->redirect('/equipos');
+            return;
+        }
+
+        // Validar datos
+        $numero_serie = $this->sanitize($this->post('numero_serie', ''));
+        $marca = $this->sanitize($this->post('marca', ''));
+        $modelo = $this->sanitize($this->post('modelo', ''));
+        $descripcion = $this->sanitize($this->post('descripcion', ''));
+        $estado_equipo = $this->post('estado_equipo', 'activo');
+
+        if (empty($numero_serie) || empty($marca) || empty($modelo)) {
+            $_SESSION['error_message'] = 'Todos los campos obligatorios deben estar completos';
+            $this->redirect('/equipos/' . $id . '/editar');
+            return;
+        }
+
+        // Verificar unicidad del número de serie
+        if ($this->equipoModel->numeroSerieExists($numero_serie, $id)) {
+            $_SESSION['error_message'] = 'El número de serie ya existe en el sistema';
+            $this->redirect('/equipos/' . $id . '/editar');
+            return;
+        }
+
+        // Actualizar el equipo
+        $updated = $this->equipoModel->update($id, [
+            'numero_serie' => $numero_serie,
+            'marca' => $marca,
+            'modelo' => $modelo,
+            'descripcion' => $descripcion,
+            'estado_equipo' => $estado_equipo
+        ]);
+
+        if (!$updated) {
+            $_SESSION['error_message'] = 'Error al actualizar el equipo';
+            $this->redirect('/equipos/' . $id . '/editar');
+            return;
+        }
+
+        // Procesar eliminación de imágenes
+        $imagenes_eliminar = $this->post('imagenes_eliminar', '');
+        if (!empty($imagenes_eliminar)) {
+            $ids = explode(',', $imagenes_eliminar);
+            foreach ($ids as $imagen_id) {
+                if (is_numeric($imagen_id)) {
+                    $imagen = $this->imagenModel->deleteImagen((int)$imagen_id);
+                    if ($imagen && file_exists(PUBLIC_PATH . $imagen['ruta_imagen'])) {
+                        unlink(PUBLIC_PATH . $imagen['ruta_imagen']);
+                    }
+                }
+            }
+        }
+
+        // Establecer nueva imagen principal si se especificó
+        $imagen_principal_id = $this->post('imagen_principal_id');
+        if (!empty($imagen_principal_id) && is_numeric($imagen_principal_id)) {
+            $this->imagenModel->setPrincipal($id, (int)$imagen_principal_id);
+        }
+
+        // Procesar nuevas imágenes
+        if (!empty($_FILES['imagenes_nuevas']['name'][0])) {
+            $this->uploadImages($id, $_FILES['imagenes_nuevas']);
+        }
+
+        $_SESSION['success_message'] = 'Equipo actualizado exitosamente';
+        $this->redirect('/equipos/' . $id);
     }
 
     /**
-     * Elimina un equipo
+     * Elimina un equipo (soft delete)
      * 
      * @param int $id ID del equipo
      * @return void
      */
     public function delete(int $id): void
     {
-        // Verificar autenticación
         Auth::requireAuth('/login');
-
-        // Verificar permisos
         Middleware::requirePermission('equipos.eliminar');
 
-        // TODO: Implementar en Fase 3
-        $this->json([
-            'success' => false,
-            'message' => 'Funcionalidad en desarrollo - Fase 3'
-        ], 501);
+        if (!$this->isPost()) {
+            $this->redirect('/equipos');
+            return;
+        }
+
+        $user = Auth::user();
+        $equipo = $this->equipoModel->find($id);
+
+        if (!$equipo) {
+            $_SESSION['error_message'] = 'Equipo no encontrado';
+            $this->redirect('/equipos');
+            return;
+        }
+
+        // Verificar permisos
+        $es_propietario = $equipo['id_usuario'] == $user['id_usuario'];
+        $es_admin = in_array($user['nombre_rol'], ['Administrador', 'Administrativo']);
+
+        if (!$es_propietario && !$es_admin) {
+            $_SESSION['error_message'] = 'No tienes permiso para eliminar este equipo';
+            $this->redirect('/equipos');
+            return;
+        }
+
+        // Realizar soft delete
+        $deleted = $this->equipoModel->softDelete($id);
+
+        if ($deleted) {
+            $_SESSION['success_message'] = 'Equipo eliminado exitosamente';
+        } else {
+            $_SESSION['error_message'] = 'Error al eliminar el equipo';
+        }
+
+        $this->redirect('/equipos');
     }
 
     /**
@@ -164,160 +413,183 @@ class EquipoController extends Controller
      */
     public function generateQR(int $id): void
     {
-        // Verificar autenticación
         Auth::requireAuth('/login');
-
-        // Verificar permisos
         Middleware::requirePermission('equipos.actualizar');
 
-        // TODO: Implementar en Fase 5
-        $this->json([
-            'success' => false,
-            'message' => 'Funcionalidad en desarrollo - Fase 5 (Códigos QR)'
-        ], 501);
+        if (!$this->isPost()) {
+            $this->redirect('/equipos/' . $id);
+            return;
+        }
+
+        $user = Auth::user();
+        $equipo = $this->equipoModel->getWithDetails($id);
+
+        if (!$equipo) {
+            $_SESSION['error_message'] = 'Equipo no encontrado';
+            $this->redirect('/equipos');
+            return;
+        }
+
+        // Verificar permisos
+        $es_propietario = $equipo['id_usuario'] == $user['id_usuario'];
+        $es_admin = in_array($user['nombre_rol'], ['Administrador', 'Administrativo']);
+
+        if (!$es_propietario && !$es_admin) {
+            $_SESSION['error_message'] = 'No tienes permiso para generar QR para este equipo';
+            $this->redirect('/equipos');
+            return;
+        }
+
+        try {
+            // Generar el código QR
+            $qrGenerator = new QRCodeGenerator();
+            
+            $qrData = $qrGenerator->generate([
+                'id_equipo' => $equipo['id_equipo'],
+                'id_usuario' => $equipo['id_usuario'],
+                'numero_serie' => $equipo['numero_serie'],
+                'nombre_usuario' => $equipo['nombres'] . ' ' . $equipo['apellidos']
+            ], $id);
+
+            // Guardar en la base de datos
+            $this->qrModel->createQR($id, $qrData['codigo_qr'], $qrData['filepath']);
+
+            $_SESSION['success_message'] = 'Código QR generado exitosamente';
+        } catch (\Exception $e) {
+            $_SESSION['error_message'] = 'Error al generar el código QR: ' . $e->getMessage();
+        }
+
+        $this->redirect('/equipos/' . $id);
     }
 
     /**
-     * Renderiza una página temporal "en construcción"
+     * Sube las imágenes del equipo
      * 
-     * @param string $titulo Título de la sección
+     * @param int $equipo_id ID del equipo
+     * @param array $files Array de archivos $_FILES
      * @return void
      */
-    private function renderEnConstruccion(string $titulo): void
+    private function uploadImages(int $equipo_id, array $files): void
     {
-        $user = Auth::user();
-        ?>
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title><?= htmlspecialchars($titulo) ?> - Sistema Atlas</title>
-            <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                body {
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    min-height: 100vh;
-                    display: flex;
-                    flex-direction: column;
-                }
-                .header {
-                    background: white;
-                    padding: 15px 30px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-                .header h1 {
-                    color: #39A900;
-                    font-size: 1.5rem;
-                }
-                .header a {
-                    color: #666;
-                    text-decoration: none;
-                    margin-left: 20px;
-                    transition: color 0.3s;
-                }
-                .header a:hover { color: #39A900; }
-                .container {
-                    flex: 1;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 20px;
-                }
-                .content {
-                    background: white;
-                    border-radius: 16px;
-                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-                    padding: 60px;
-                    text-align: center;
-                    max-width: 600px;
-                }
-                .icon {
-                    font-size: 100px;
-                    margin-bottom: 20px;
-                }
-                h2 {
-                    font-size: 2rem;
-                    color: #333;
-                    margin-bottom: 15px;
-                }
-                p {
-                    color: #666;
-                    font-size: 1.1rem;
-                    line-height: 1.6;
-                    margin-bottom: 30px;
-                }
-                .info-box {
-                    background: #f8f9fa;
-                    padding: 20px;
-                    border-radius: 8px;
-                    margin: 25px 0;
-                    border-left: 4px solid #39A900;
-                    text-align: left;
-                }
-                .info-box strong {
-                    color: #39A900;
-                }
-                .btn {
-                    display: inline-block;
-                    padding: 15px 35px;
-                    background: #39A900;
-                    color: white;
-                    text-decoration: none;
-                    border-radius: 8px;
-                    font-weight: 600;
-                    transition: all 0.3s;
-                    margin: 10px;
-                }
-                .btn:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 20px rgba(57, 169, 0, 0.3);
-                }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>🎓 Sistema Atlas</h1>
-                <div>
-                    <span style="color: #666;">
-                        <?= htmlspecialchars($user['nombres'] . ' ' . $user['apellidos']) ?> 
-                        (<?= htmlspecialchars($user['nombre_rol']) ?>)
-                    </span>
-                    <a href="/dashboard">Dashboard</a>
-                    <a href="/logout">Cerrar Sesión</a>
-                </div>
-            </div>
+        $upload_dir = EQUIPOS_UPLOAD_PATH;
+        
+        // Crear directorio si no existe
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
 
-            <div class="container">
-                <div class="content">
-                    <div class="icon">🚧</div>
-                    <h2><?= htmlspecialchars($titulo) ?></h2>
-                    <p>Esta funcionalidad está en desarrollo y estará disponible próximamente.</p>
-                    
-                    <div class="info-box">
-                        <p><strong>Estado:</strong> En Construcción</p>
-                        <p><strong>Sección:</strong> <?= htmlspecialchars($titulo) ?></p>
-                        <p><strong>Fase de Desarrollo:</strong> Fase 3 - Gestión de Equipos</p>
-                    </div>
+        $allowed_types = ['image/jpeg', 'image/jpg', 'image/png'];
+        $max_size = 5 * 1024 * 1024; // 5MB
 
-                    <p style="font-size: 0.95rem; color: #999;">
-                        La Fase 2 (Autenticación y Roles) está completamente funcional. 
-                        Esta sección se implementará en la Fase 3 del proyecto.
-                    </p>
+        $total_images = $this->imagenModel->countByEquipo($equipo_id);
+        $uploaded = 0;
 
-                    <div>
-                        <a href="/dashboard" class="btn">🏠 Volver al Dashboard</a>
-                    </div>
-                </div>
-            </div>
-        </body>
-        </html>
-        <?php
-        exit;
+        foreach ($files['tmp_name'] as $key => $tmp_name) {
+            // Validar que el archivo existe
+            if (!is_uploaded_file($tmp_name)) {
+                continue;
+            }
+
+            // Validar límite de imágenes
+            if ($total_images + $uploaded >= 5) {
+                break;
+            }
+
+            // Validar tipo
+            $file_type = $files['type'][$key];
+            if (!in_array($file_type, $allowed_types)) {
+                continue;
+            }
+
+            // Validar tamaño
+            if ($files['size'][$key] > $max_size) {
+                continue;
+            }
+
+            // Generar nombre único
+            $extension = pathinfo($files['name'][$key], PATHINFO_EXTENSION);
+            $filename = 'equipo_' . $equipo_id . '_' . time() . '_' . uniqid() . '.' . $extension;
+            $filepath = $upload_dir . '/' . $filename;
+            $relative_path = '/uploads/equipos/' . $filename;
+
+            // Mover archivo
+            if (move_uploaded_file($tmp_name, $filepath)) {
+                // Redimensionar imagen si es necesario
+                $this->resizeImage($filepath, 1200, 1200);
+
+                // Guardar en base de datos
+                $tipo = ($total_images + $uploaded === 0) ? 'principal' : 'detalle';
+                $this->imagenModel->saveImagen($equipo_id, $relative_path, $tipo);
+                
+                $uploaded++;
+            }
+        }
+    }
+
+    /**
+     * Redimensiona una imagen manteniendo su proporción
+     * 
+     * @param string $filepath Ruta del archivo
+     * @param int $max_width Ancho máximo
+     * @param int $max_height Alto máximo
+     * @return void
+     */
+    private function resizeImage(string $filepath, int $max_width, int $max_height): void
+    {
+        $image_info = getimagesize($filepath);
+        if (!$image_info) {
+            return;
+        }
+
+        list($width, $height, $type) = $image_info;
+
+        // Si la imagen ya es más pequeña, no hacer nada
+        if ($width <= $max_width && $height <= $max_height) {
+            return;
+        }
+
+        // Calcular nuevas dimensiones
+        $ratio = min($max_width / $width, $max_height / $height);
+        $new_width = (int)($width * $ratio);
+        $new_height = (int)($height * $ratio);
+
+        // Crear imagen desde el archivo
+        switch ($type) {
+            case IMAGETYPE_JPEG:
+                $source = imagecreatefromjpeg($filepath);
+                break;
+            case IMAGETYPE_PNG:
+                $source = imagecreatefrompng($filepath);
+                break;
+            default:
+                return;
+        }
+
+        // Crear nueva imagen redimensionada
+        $destination = imagecreatetruecolor($new_width, $new_height);
+
+        // Preservar transparencia para PNG
+        if ($type == IMAGETYPE_PNG) {
+            imagealphablending($destination, false);
+            imagesavealpha($destination, true);
+        }
+
+        // Redimensionar
+        imagecopyresampled($destination, $source, 0, 0, 0, 0, $new_width, $new_height, $width, $height);
+
+        // Guardar imagen
+        switch ($type) {
+            case IMAGETYPE_JPEG:
+                imagejpeg($destination, $filepath, 90);
+                break;
+            case IMAGETYPE_PNG:
+                imagepng($destination, $filepath, 9);
+                break;
+        }
+
+        // Liberar memoria
+        imagedestroy($source);
+        imagedestroy($destination);
     }
 }
 

@@ -1,0 +1,314 @@
+/**
+ * Sistema Atlas - Estilos de Detalle de Equipos
+ * Vista de detalle individual
+ */
+
+/* Contenedor principal */
+.detail-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Header del detalle */
+.detail-header {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.detail-title {
+    flex: 1;
+}
+
+.detail-title h2 {
+    color: #39A900;
+    margin-bottom: 0.5rem;
+}
+
+.detail-subtitle {
+    color: #666;
+    font-size: 1.1rem;
+}
+
+.detail-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Contenido del detalle */
+.detail-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+/* Secciones del detalle */
+.detail-section {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.detail-section.full-width {
+    grid-column: 1 / -1;
+}
+
+.section-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #39A900;
+}
+
+/* Grid de información */
+.info-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-label {
+    font-size: 0.9rem;
+    color: #666;
+    font-weight: 600;
+}
+
+.info-value {
+    font-size: 1.1rem;
+    color: #333;
+}
+
+.info-value.monospace {
+    font-family: 'Courier New', monospace;
+    background: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 4px;
+}
+
+/* Badge de estado */
+.status-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.status-activo {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-inactivo {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-bloqueado {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-en_revision {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+/* Galería */
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.gallery-item {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.gallery-item:hover {
+    transform: scale(1.05);
+}
+
+.gallery-item img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+.gallery-badge {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    background: #39A900;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Contenedor de QR */
+.qr-container {
+    text-align: center;
+    padding: 2rem;
+}
+
+.qr-image {
+    max-width: 300px;
+    margin: 0 auto 1rem;
+    border: 2px solid #39A900;
+    border-radius: 8px;
+    padding: 1rem;
+    background: white;
+}
+
+.qr-image img {
+    width: 100%;
+    height: auto;
+}
+
+.qr-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Sin QR */
+.no-qr {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+}
+
+.no-qr-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+/* Información del usuario */
+.user-info {
+    background: #E8F5E0;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid #39A900;
+}
+
+/* Galería vacía */
+.empty-gallery {
+    text-align: center;
+    padding: 3rem;
+    color: #666;
+}
+
+/* Modal de imagen */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+}
+
+.modal-content {
+    margin: 5% auto;
+    display: block;
+    max-width: 90%;
+    max-height: 80%;
+}
+
+.modal-close {
+    position: absolute;
+    top: 2rem;
+    right: 2rem;
+    color: white;
+    font-size: 3rem;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Timeline de eventos */
+.timeline {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #39A900;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+    padding-left: 1.5rem;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -2.5rem;
+    top: 0.5rem;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #39A900;
+    border: 3px solid white;
+    box-shadow: 0 0 0 2px #39A900;
+}
+
+.timeline-date {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 0.25rem;
+}
+
+.timeline-event {
+    font-weight: 600;
+    color: #333;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .detail-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .detail-header {
+        flex-direction: column;
+    }
+    
+    .gallery-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+

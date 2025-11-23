@@ -57,6 +57,7 @@ $RECYCLE.BIN/
 # Visual Studio Code
 .vscode/
 *.code-workspace
+/.cursor
 
 # PhpStorm / IntelliJ
 .idea/
